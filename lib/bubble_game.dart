@@ -34,6 +34,7 @@ class BubbleGame extends FlameGame
   double timeLeft = 60.0;
   bool levelActive = false;
   bool started = false;
+  bool npcSpawnedVisible = false; // 仅在NPC实际出现后才允许胜利判定
   // 小点补充计时
   int dotCount = 0;
   double replenishAccum = 0.0;
@@ -110,6 +111,23 @@ class BubbleGame extends FlameGame
     // HUD 文本（初始显示游戏名）
     levelText = TextComponent(text: '目标：在60秒内清除所有红色NPC', position: Vector2(10, 10), priority: 1000);
     timeText = TextComponent(text: '剩余: 60.0s  NPC: --', position: Vector2(10, 30), priority: 1000);
+    // 设置HUD文本颜色为深色，提升可读性
+    levelText.textRenderer = TextPaint(
+      style: const TextStyle(
+        color: Colors.black87,
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        shadows: [Shadow(color: Colors.white70, offset: Offset(1, 1), blurRadius: 2)],
+      ),
+    );
+    timeText.textRenderer = TextPaint(
+      style: const TextStyle(
+        color: Colors.black87,
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        shadows: [Shadow(color: Colors.white70, offset: Offset(1, 1), blurRadius: 2)],
+      ),
+    );
     add(levelText);
     add(timeText);
 
@@ -145,20 +163,20 @@ class BubbleGame extends FlameGame
     if (levelActive) {
       timeLeft -= dt;
       final remainingNpc = children.whereType<NpcBubble>().where((n) => n.alive).length;
+      // 标记NPC已出现，避免立即被判定为胜利
+      if (!npcSpawnedVisible && remainingNpc > 0) {
+        npcSpawnedVisible = true;
+      }
       timeText.text = '剩余: ${timeLeft.toStringAsFixed(1)}s  NPC: $remainingNpc';
 
-      if (remainingNpc == 0) {
-        // 通关：显示“挑战成功”，延迟进入下一关或胜利
+      if (npcSpawnedVisible && remainingNpc == 0) {
+        // 通关：弹出提示覆盖层，进入下一关或最终胜利
         levelActive = false;
         levelText.text = '挑战成功';
         if (currentLevel < 3) {
-          add(TimerComponent(period: 1.0, onTick: () {
-            _startLevel(currentLevel + 1);
-          }));
+          overlays.add('NextLevel');
         } else {
-          add(TimerComponent(period: 1.0, onTick: () {
-            levelText.text = '胜利!';
-          }));
+          showVictory();
         }
       } else if (timeLeft <= 0) {
         // 失败：暂停关卡并显示“再来一次”按钮
@@ -179,6 +197,12 @@ class BubbleGame extends FlameGame
 
     // 定时生成道具（持续补充，限制数量上限；按关卡规则）
     if (started && levelActive) {
+      // 第二关强制移除恶魔道具，确保只保留⚡
+      if (currentLevel == 2) {
+        for (final sh in children.whereType<ShieldItem>().toList()) {
+          sh.removeFromParent();
+        }
+      }
       itemSpawnAccum += dt;
       if (itemSpawnAccum >= itemSpawnInterval) {
         itemSpawnAccum = 0.0;
@@ -301,7 +325,20 @@ class BubbleGame extends FlameGame
     currentLevel = level;
     timeLeft = 60.0;
     levelActive = true;
+    npcSpawnedVisible = false; // 重置，等待NPC出现
     levelText.text = '关卡: $currentLevel | 目标：在60秒内清除所有红色NPC';
+
+    // 每关开始重置并补充深色可吃的小气泡，保证数量一致
+    for (final d in children.whereType<Dot>().toList()) {
+      d.removeFromParent();
+    }
+    dotCount = 0;
+    _spawnDots(200); // 统一每关初始数量
+
+    // 每一关重置玩家大小到初始值
+    player
+      ..radius = 6
+      ..size = Vector2.all(12);
 
     // 清理现有 NPC
     for (final npc in children.whereType<NpcBubble>().toList()) {
@@ -319,7 +356,10 @@ class BubbleGame extends FlameGame
     final npcCount = 3 + 2 * (currentLevel - 1);
     for (int i = 0; i < npcCount; i++) {
       final pos = _randomInsideWorld(offset: 80);
-      final npcR = 6.0 + _rng.nextDouble() * 6.0;
+      // 收紧同关NPC尺寸差异：按关卡设定基础半径+小抖动
+      final baseR = (currentLevel == 1) ? 8.0 : (currentLevel == 2) ? 9.0 : 10.0;
+      final jitter = (_rng.nextDouble() * 2 - 1) * 1.0; // ±1.0
+      final npcR = (baseR + jitter).clamp(6.0, 12.0);
       final vel = Vector2(
         (_rng.nextDouble() * 2 - 1) * 60,
         (_rng.nextDouble() * 2 - 1) * 60,
@@ -345,6 +385,7 @@ class BubbleGame extends FlameGame
     overlays.remove('Retry');
     timeLeft = 60.0;
     levelActive = true;
+    npcSpawnedVisible = false; // 重置，等待NPC出现
     levelText.text = '关卡: $currentLevel | 目标：在60秒内清除所有红色NPC';
 
     // 复活玩家：如果之前被移除则重新创建并添加，否则重置状态与位置
@@ -381,7 +422,10 @@ class BubbleGame extends FlameGame
     final npcCount = 3 + 2 * (currentLevel - 1);
     for (int i = 0; i < npcCount; i++) {
       final pos = _randomInsideWorld(offset: 80);
-      final npcR = 6.0 + _rng.nextDouble() * 6.0;
+      // 收紧同关NPC尺寸差异：按关卡设定基础半径+小抖动
+      final baseR = (currentLevel == 1) ? 8.0 : (currentLevel == 2) ? 9.0 : 10.0;
+      final jitter = (_rng.nextDouble() * 2 - 1) * 1.0; // ±1.0
+      final npcR = (baseR + jitter).clamp(6.0, 12.0);
       final vel = Vector2(
         (_rng.nextDouble() * 2 - 1) * 60,
         (_rng.nextDouble() * 2 - 1) * 60,
@@ -404,6 +448,54 @@ class BubbleGame extends FlameGame
 
     // 重置倒计时文本
     timeText.text = '剩余: 60.0s  NPC: --';
+  }
+
+  void startNextLevel() {
+    overlays.remove('NextLevel');
+    _startLevel(currentLevel + 1);
+  }
+
+  void showVictory() {
+    levelText.text = '胜利!';
+    overlays.add('Victory');
+    add(ConfettiEmitter(center: Vector2(worldWidth / 2, worldHeight / 2), count: 120));
+  }
+
+  void restartGame() {
+    overlays.remove('Victory');
+    currentLevel = 1;
+    started = true;
+
+    for (final d in children.whereType<Dot>().toList()) {
+      d.removeFromParent();
+    }
+    for (final npc in children.whereType<NpcBubble>().toList()) {
+      npc.removeFromParent();
+    }
+    for (final s in children.whereType<ShoeItem>().toList()) {
+      s.removeFromParent();
+    }
+    for (final sh in children.whereType<ShieldItem>().toList()) {
+      sh.removeFromParent();
+    }
+
+    player
+      ..alive = true
+      ..shieldActive = false
+      ..speedMultiplier = 1.0
+      ..velocity = Vector2.zero()
+      ..position = Vector2(worldWidth / 2, worldHeight / 2)
+      ..radius = 6
+      ..size = Vector2.all(12);
+    camera.follow(player);
+
+    dotCount = 0;
+    replenishAccum = 0.0;
+    levelText.text = '关卡: 1 | 目标：在60秒内清除所有红色NPC';
+    timeText.text = '剩余: 60.0s  NPC: --';
+
+    _spawnDots(200);
+    _startLevel(1);
   }
 }
 
@@ -769,5 +861,82 @@ class GrowthText extends TextComponent {
     if (life <= 0) {
       removeFromParent();
     }
+  }
+}
+
+class ConfettiPiece extends PositionComponent {
+  final Paint _paint;
+  Vector2 velocity;
+  double angularVelocity;
+  double gravity = 200.0;
+  double life = 2.5;
+
+  ConfettiPiece({required Vector2 position, required Color color})
+      : _paint = Paint()..color = color,
+        velocity = Vector2(
+          (Random().nextDouble() * 2 - 1) * 160,
+          -(80 + Random().nextDouble() * 140),
+        ),
+        angularVelocity = (Random().nextDouble() * 2 - 1) * 6,
+        super(position: position, size: Vector2(6 + Random().nextDouble() * 4, 3 + Random().nextDouble() * 2), anchor: Anchor.center) {
+    priority = 2000;
+  }
+
+  @override
+  void render(Canvas canvas) {
+    final rect = Rect.fromCenter(
+      center: Offset.zero,
+      width: size.x,
+      height: size.y,
+    );
+    canvas.save();
+    canvas.translate(0, 0);
+    canvas.rotate(angle);
+    canvas.drawRect(rect, _paint);
+    canvas.restore();
+  }
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    position += velocity * dt;
+    velocity.y += gravity * dt;
+    angle += angularVelocity * dt;
+    life -= dt;
+    if (life <= 0) {
+      removeFromParent();
+    }
+  }
+}
+
+class ConfettiEmitter extends Component with HasGameRef<BubbleGame> {
+  final Vector2 center;
+  final int count;
+  ConfettiEmitter({required this.center, this.count = 100});
+
+  @override
+  Future<void> onLoad() async {
+    super.onLoad();
+    final colors = [
+      Colors.pinkAccent,
+      Colors.amber,
+      Colors.lightGreen,
+      Colors.cyan,
+      Colors.deepPurpleAccent,
+      Colors.orange,
+    ];
+    for (int i = 0; i < count; i++) {
+      final jitter = Vector2(
+        (Random().nextDouble() * 2 - 1) * 60,
+        (Random().nextDouble() * 2 - 1) * 40,
+      );
+      final pos = center + jitter;
+      final color = colors[Random().nextInt(colors.length)];
+      gameRef.add(ConfettiPiece(position: pos, color: color));
+    }
+    // 自动移除发射器
+    add(TimerComponent(period: 3.0, onTick: () {
+      removeFromParent();
+    }));
   }
 }
