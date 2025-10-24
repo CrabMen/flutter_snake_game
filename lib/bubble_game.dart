@@ -133,8 +133,8 @@ class BubbleGame extends FlameGame
 
     // 移动端/网页虚拟摇杆（开始时即可使用）
     joystick = JoystickComponent(
-      knob: CircleComponent(radius: 14, paint: Paint()..color = Colors.black54),
-      background: CircleComponent(radius: 40, paint: Paint()..color = Colors.black12),
+      knob: CircleComponent(radius: 22, paint: Paint()..color = Colors.black54),
+      background: CircleComponent(radius: 80, paint: Paint()..color = Colors.black12),
       margin: const EdgeInsets.only(left: 24, bottom: 24),
     );
     add(joystick);
