@@ -16716,7 +16716,7 @@ return n}}
 A.Uz.prototype={
 $1(a){var s=A.c4().b
 s=s==null?null:s.canvasKitBaseUrl
-return(s==null?"https://www.gstatic.com/flutter-canvaskit/d2913632a4578ee4d0b8b1c4a69888c8a0672c4b/":s)+a},
+return(s==null?"https://www.gstatic.com/flutter-canvaskit/035316565ad77281a75305515e4682e6c4c6f7ca/":s)+a},
 $S:70}
 A.tw.prototype={
 dP(a,b){var s,r=this.a
@@ -45156,10 +45156,10 @@ q.ao(q.dG)
 q.ao(q.hX)
 g=A.b1()
 g.r=B.r.gM()
-g=A.Z1(null,null,null,null,g,null,null,null,14,null)
+g=A.Z1(null,null,null,null,g,null,null,null,22,null)
 h=A.b1()
 h.r=B.f6.gM()
-h=A.Z1(null,null,null,null,h,null,null,null,40,null)
+h=A.Z1(null,null,null,null,h,null,null,null,80,null)
 p=new Float32Array(2)
 o=new Float32Array(2)
 n=h.ay
